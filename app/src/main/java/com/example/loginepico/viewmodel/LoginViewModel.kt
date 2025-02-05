@@ -14,6 +14,30 @@ class LoginViewModel(
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
     val loginState: StateFlow<LoginState> = _loginState
 
+    private val _isRegisterMode = MutableStateFlow(false)
+    val isRegisterMode: StateFlow<Boolean> = _isRegisterMode
+
+    fun toggleMode() {
+        _isRegisterMode.value = !_isRegisterMode.value
+    }
+
+    fun register(email: String, password: String, name: String) {
+        viewModelScope.launch {
+            _loginState.value = LoginState.Loading
+            try {
+                loginRepository.register(email, password, name)
+                    .onSuccess {
+                        _loginState.value = LoginState.Success("Registro exitoso")
+                    }
+                    .onFailure { exception ->
+                        _loginState.value = LoginState.Error(exception.message ?: "Error desconocido")
+                    }
+            } catch (e: Exception) {
+                _loginState.value = LoginState.Error(e.message ?: "Error desconocido")
+            }
+        }
+    }
+
     fun login(email: String, password: String) {
         viewModelScope.launch {
             _loginState.value = LoginState.Loading

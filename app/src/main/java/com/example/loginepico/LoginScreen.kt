@@ -30,101 +30,79 @@ import retrofit2.Response
 import kotlin.Result
 
 @Composable
-fun LoginScreen(viewModel: LoginViewModel) {
+fun LoginScreen(
+    viewModel: LoginViewModel,
+    onLoginSuccess: () -> Unit
+) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
     
     val loginState = viewModel.loginState.collectAsStateWithLifecycle()
+    val isRegisterMode = viewModel.isRegisterMode.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        // Imagen circular
-        Image(
-            painter = painterResource(id = R.drawable.img),
-            contentDescription = "Logo",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
         Text(
-            text = "Bienvenido",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            text = if (isRegisterMode.value) "Registro" else "Login",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Campo de email
+        if (isRegisterMode.value) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nombre") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text("Correo electrónico") },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            shape = MaterialTheme.shapes.medium,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline
-            )
+            label = { Text("Email") },
+            modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Campo de contraseña
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
             label = { Text("Contraseña") },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            shape = MaterialTheme.shapes.medium,
             visualTransformation = PasswordVisualTransformation(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outline
-            )
+            modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Botón de login actualizado
         Button(
-            onClick = { viewModel.login(email, password) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .height(50.dp),
-            shape = MaterialTheme.shapes.medium,
-            enabled = loginState.value !is LoginState.Loading
+            onClick = {
+                if (isRegisterMode.value) {
+                    viewModel.register(email, password, name)
+                } else {
+                    viewModel.login(email, password)
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
         ) {
-            if (loginState.value is LoginState.Loading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            } else {
-                Text(
-                    text = "Iniciar Sesión",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            Text(if (isRegisterMode.value) "Registrarse" else "Iniciar Sesión")
+        }
+
+        TextButton(
+            onClick = { viewModel.toggleMode() }
+        ) {
+            Text(if (isRegisterMode.value) "¿Ya tienes cuenta? Inicia sesión" else "¿No tienes cuenta? Regístrate")
         }
 
         // Mostrar mensaje de error si existe
@@ -140,6 +118,13 @@ fun LoginScreen(viewModel: LoginViewModel) {
             else -> {}
         }
     }
+
+    // En el estado de éxito, navega a TodoScreen
+    LaunchedEffect(loginState.value) {
+        if (loginState.value is LoginState.Success) {
+            onLoginSuccess()
+        }
+    }
 }
 
 @Preview(showBackground = true)
@@ -149,7 +134,11 @@ fun LoginScreenPreview() {
         override suspend fun login(username: String, password: String): Result<Boolean> {
             return Result.success(true)
         }
+
+        override suspend fun register(email: String, password: String, name: String): Result<Boolean> {
+            return Result.success(true)
+        }
     })
-    LoginScreen(viewModel = previewViewModel)
+    LoginScreen(viewModel = previewViewModel) { }
 }
 
