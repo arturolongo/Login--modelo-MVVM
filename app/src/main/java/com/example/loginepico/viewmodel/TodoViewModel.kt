@@ -1,15 +1,18 @@
 package com.example.loginepico.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.loginepico.data.model.Todo
 import com.example.loginepico.data.repository.TodoRepository
+import com.example.loginepico.utils.CameraManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class TodoViewModel(
-    private val repository: TodoRepository
+    private val repository: TodoRepository,
+    private val openCamera: () -> Unit
 ) : ViewModel() {
     private val _state = MutableStateFlow<TodoState>(TodoState.Loading)
     val state: StateFlow<TodoState> = _state
@@ -29,6 +32,14 @@ class TodoViewModel(
     private val _selectedTodo = MutableStateFlow<Todo?>(null)
     val selectedTodo: StateFlow<Todo?> = _selectedTodo
 
+    private var currentPhotoPath: String? = null
+    
+    private val _showCamera = MutableStateFlow(false)
+    val showCamera: StateFlow<Boolean> = _showCamera
+
+    private val _currentPhotoUri = MutableStateFlow<String?>(null)
+    val currentPhotoUri: StateFlow<String?> = _currentPhotoUri
+
     init {
         loadTodos()
     }
@@ -36,12 +47,15 @@ class TodoViewModel(
     fun loadTodos() {
         viewModelScope.launch {
             _state.value = TodoState.Loading
+            println("Cargando todos...")  // Debug
             repository.getTodos()
                 .onSuccess { todos ->
+                    println("Todos cargados exitosamente: ${todos.size} items")  // Debug
                     _todos.value = todos
                     _state.value = TodoState.Success
                 }
                 .onFailure { e ->
+                    println("Error al cargar todos: ${e.message}")  // Debug
                     _state.value = TodoState.Error(e.message ?: "Error desconocido")
                 }
         }
@@ -53,21 +67,46 @@ class TodoViewModel(
 
     fun hideAddDialog() {
         _isDialogVisible.value = false
+        _currentPhotoUri.value = null
+        currentPhotoPath = null
+    }
+
+    fun startCamera() {
+        _showCamera.value = true
+    }
+
+    fun onImageCaptured(uri: Uri) {
+        _currentPhotoUri.value = uri.toString()
+        _showCamera.value = false
     }
 
     fun addTodo(title: String, description: String) {
         viewModelScope.launch {
             _state.value = TodoState.Loading
             try {
-                repository.createTodo(title, description)
-                    .onSuccess { 
-                        loadTodos() // Recargar la lista
-                        hideAddDialog()
-                    }
-                    .onFailure { e ->
-                        _state.value = TodoState.Error(e.message ?: "Error al crear todo")
-                    }
+                println("Creando todo: $title")  // Debug
+                val imageFile = _currentPhotoUri.value?.let { uriString ->
+                    val uri = Uri.parse(uriString)
+                    println("URI de imagen: $uriString")  // Debug
+                    uri.path
+                }
+                
+                val result = repository.createTodo(
+                    title = title,
+                    description = description,
+                    imageUrl = imageFile
+                )
+                result.onSuccess { todo -> 
+                    println("Todo creado exitosamente: ${todo.id}")  // Debug
+                    loadTodos()  // Recargar la lista
+                    hideAddDialog()
+                }
+                result.onFailure { e ->
+                    println("Error al crear todo: ${e.message}")  // Debug
+                    _state.value = TodoState.Error(e.message ?: "Error al crear todo")
+                }
             } catch (e: Exception) {
+                println("Excepción al crear todo: ${e.message}")  // Debug
                 _state.value = TodoState.Error(e.message ?: "Error desconocido")
             }
         }
@@ -113,7 +152,7 @@ class TodoViewModel(
         viewModelScope.launch {
             _state.value = TodoState.Loading
             try {
-                repository.updateTodo(id, title, description)
+                repository.updateTodo(id, title, description, currentPhotoPath)
                     .onSuccess { 
                         loadTodos() // Recargar la lista
                         hideEditDialog()
@@ -143,6 +182,10 @@ class TodoViewModel(
                 _state.value = TodoState.Error(e.message ?: "Error desconocido")
             }
         }
+    }
+
+    fun openCamera() {
+        openCamera.invoke()
     }
 
     // Implementar resto de métodos CRUD...

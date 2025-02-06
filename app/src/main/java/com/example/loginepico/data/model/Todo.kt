@@ -4,8 +4,9 @@ data class Todo(
     val id: String,
     val title: String,
     val description: String,
-    val completed: Boolean,
-    val userId: String,
+    val imageUrl: String? = null,
+    val completed: Boolean = false,
+    val userId: String? = null,
     val createdAt: String,
     val updatedAt: String
 ) 

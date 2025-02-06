@@ -21,15 +21,19 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.loginepico.viewmodel.TodoViewModel
 import com.example.loginepico.viewmodel.TodoState
 import com.example.loginepico.data.model.Todo
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.border
 
 @Composable
 fun TodoScreen(viewModel: TodoViewModel) {
     val todos by viewModel.todos.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val isAddDialogVisible by viewModel.isDialogVisible.collectAsStateWithLifecycle()
-    val isEditDialogVisible by viewModel.isEditDialogVisible.collectAsStateWithLifecycle()
-    val selectedTodo by viewModel.selectedTodo.collectAsStateWithLifecycle()
-    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -42,17 +46,6 @@ fun TodoScreen(viewModel: TodoViewModel) {
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // Barra de búsqueda
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { viewModel.updateSearchQuery(it) },
-            label = { Text("Buscar por título") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            leadingIcon = { Icon(Icons.Default.Search, "Buscar") }
-        )
-
         when (state) {
             is TodoState.Loading -> {
                 CircularProgressIndicator(
@@ -62,22 +55,27 @@ fun TodoScreen(viewModel: TodoViewModel) {
             is TodoState.Error -> {
                 Text(
                     text = (state as TodoState.Error).message,
-                    color = MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(16.dp)
                 )
             }
             is TodoState.Success -> {
-                LazyColumn {
-                    items(todos) { todo ->
-                        TodoItem(
-                            todo = todo,
-                            onEdit = { viewModel.showEditDialog(todo) },
-                            onDelete = { viewModel.deleteTodo(todo.id) }
-                        )
+                if (todos.isEmpty()) {
+                    Text(
+                        text = "No hay pendientes",
+                        modifier = Modifier.padding(16.dp)
+                    )
+                } else {
+                    LazyColumn {
+                        items(todos) { todo ->
+                            TodoItem(todo = todo, viewModel = viewModel)
+                        }
                     }
                 }
             }
         }
 
+        // Botón flotante para agregar
         FloatingActionButton(
             onClick = { viewModel.showAddDialog() },
             modifier = Modifier
@@ -88,14 +86,21 @@ fun TodoScreen(viewModel: TodoViewModel) {
         }
     }
 
+    // Diálogo para agregar todo
     if (isAddDialogVisible) {
         AddTodoDialog(
             onDismiss = { viewModel.hideAddDialog() },
             onConfirm = { title, description ->
                 viewModel.addTodo(title, description)
-            }
+            },
+            onTakePhoto = { viewModel.openCamera() },
+            currentPhotoUri = viewModel.currentPhotoUri.collectAsStateWithLifecycle().value
         )
     }
+
+    // Diálogo de edición
+    val isEditDialogVisible by viewModel.isEditDialogVisible.collectAsStateWithLifecycle()
+    val selectedTodo by viewModel.selectedTodo.collectAsStateWithLifecycle()
 
     if (isEditDialogVisible && selectedTodo != null) {
         EditTodoDialog(
@@ -103,7 +108,9 @@ fun TodoScreen(viewModel: TodoViewModel) {
             onDismiss = { viewModel.hideEditDialog() },
             onConfirm = { title, description ->
                 viewModel.updateTodo(selectedTodo!!.id, title, description)
-            }
+            },
+            onTakePhoto = { viewModel.openCamera() },
+            currentPhotoUri = viewModel.currentPhotoUri.collectAsStateWithLifecycle().value
         )
     }
 }
@@ -111,38 +118,66 @@ fun TodoScreen(viewModel: TodoViewModel) {
 @Composable
 fun TodoItem(
     todo: Todo,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
+    viewModel: TodoViewModel
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.padding(8.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = todo.title,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = todo.description,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-            Row {
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, "Editar")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Contenido del texto
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
+                ) {
+                    Text(
+                        text = todo.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = todo.description,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, "Eliminar")
+
+                // Botones de acción
+                Row {
+                    IconButton(onClick = { viewModel.showEditDialog(todo) }) {
+                        Icon(Icons.Default.Edit, "Editar")
+                    }
+                    IconButton(onClick = { viewModel.deleteTodo(todo.id) }) {
+                        Icon(Icons.Default.Delete, "Eliminar")
+                    }
+                }
+            }
+
+            // Imagen si existe
+            if (!todo.imageUrl.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                ) {
+                    AsyncImage(
+                        model = todo.imageUrl,
+                        contentDescription = "Imagen adjunta",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
                 }
             }
         }
@@ -152,7 +187,9 @@ fun TodoItem(
 @Composable
 fun AddTodoDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit
+    onConfirm: (String, String) -> Unit,
+    onTakePhoto: () -> Unit,
+    currentPhotoUri: String?
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -168,13 +205,39 @@ fun AddTodoDialog(
                     label = { Text("Título") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                
                 Spacer(modifier = Modifier.height(8.dp))
+                
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Descripción") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Botón para tomar foto
+                Button(
+                    onClick = onTakePhoto,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Añadir Foto")
+                }
+
+                // Mostrar la vista previa de la foto si existe
+                if (currentPhotoUri != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AsyncImage(
+                        model = currentPhotoUri,
+                        contentDescription = "Vista previa",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
         },
         confirmButton = {
@@ -200,7 +263,9 @@ fun AddTodoDialog(
 fun EditTodoDialog(
     todo: Todo,
     onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit
+    onConfirm: (String, String) -> Unit,
+    onTakePhoto: () -> Unit,
+    currentPhotoUri: String?
 ) {
     var title by remember { mutableStateOf(todo.title) }
     var description by remember { mutableStateOf(todo.description) }
@@ -216,13 +281,39 @@ fun EditTodoDialog(
                     label = { Text("Título") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                
                 Spacer(modifier = Modifier.height(8.dp))
+                
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Descripción") },
                     modifier = Modifier.fillMaxWidth()
                 )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Botón para tomar foto
+                Button(
+                    onClick = onTakePhoto,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Cambiar Foto")
+                }
+
+                // Mostrar la foto actual o la nueva
+                if (currentPhotoUri != null || todo.imageUrl != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AsyncImage(
+                        model = currentPhotoUri ?: todo.imageUrl,
+                        contentDescription = "Vista previa",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
         },
         confirmButton = {
