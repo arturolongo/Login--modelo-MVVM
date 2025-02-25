@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "771786843734",
+    "project_id": "loginarturito-9a2dc",
+    "storage_bucket": "loginarturito-9a2dc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:771786843734:android:14b20819939604b83afdf7",
+        "android_client_info": {
+          "package_name": "com.example.loginepico"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDaXc4dOh30XBodwV9WZ7lftseHkTTP3JQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

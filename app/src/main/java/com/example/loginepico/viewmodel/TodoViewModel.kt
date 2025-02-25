@@ -1,11 +1,14 @@
 package com.example.loginepico.viewmodel
 
+import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.loginepico.data.model.Todo
 import com.example.loginepico.data.repository.TodoRepository
 import com.example.loginepico.utils.CameraManager
+import com.example.loginepico.utils.NotificationManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -186,6 +189,27 @@ class TodoViewModel(
 
     fun openCamera() {
         openCamera.invoke()
+    }
+
+    fun initializeFirebase(context: Context) {
+        NotificationManager.requestNotificationPermission(context) { granted ->
+            if (granted) {
+                NotificationManager.getFirebaseToken(
+                    onSuccess = { token ->
+                        // Hacer el token MUY visible
+                        Log.e("FCM_TOKEN", "===========================================")
+                        Log.e("FCM_TOKEN", "COPIAR ESTE TOKEN PARA FIREBASE CONSOLE:")
+                        Log.e("FCM_TOKEN", token)
+                        Log.e("FCM_TOKEN", "===========================================")
+                    },
+                    onError = { exception ->
+                        Log.e("FCM_TOKEN", "Error al obtener token", exception)
+                    }
+                )
+            } else {
+                _state.value = TodoState.Error("Se requieren permisos de notificación")
+            }
+        }
     }
 
     // Implementar resto de métodos CRUD...
